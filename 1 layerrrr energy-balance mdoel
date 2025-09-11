@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""
+One-layer (epsilon=1) energy-balance model.
+
+Purpose
+-------
+Given a solar constant S0 and an albedo alpha, compute the surface
+temperature for a perfectly longwave-opaque single-layer atmosphere,
+and place an observed anomaly series on the same absolute Kelvin scale
+by anchoring to a baseline year. This lets us visually test whether
+solar-only changes can match observed warming.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# --- constants & example inputs ---
+sigma = 5.67e-8  # Stefan-Boltzmann constant
+
+# Example time points and values used in the solar-forcing check
+year   = np.array([1900, 1950, 2000])
+s0     = np.array([1365.0, 1366.5, 1368.0])  # solar constant
+t_anom = np.array([-0.4, 0.0, 0.4])          # temperature anomaly
+
+
+def temp_1layer(s0=1365.0, albedo=0.33):
+    """
+    Surface temperature for a 1-layer, perfectly longwave-opaque atmosphere.
+
+    Physics Formula:
+        Ts**4 = ((1 - alpha) * S0) / (2 * sigma)
+    where S0 is the solar constant and alpha is the planetary albedo.
+
+    Parameters
+    ----------
+    s0 : float or array-like
+        Solar constant(s) in W m^-2.
+    albedo : float
+        Planetary albedo (default 0.33).
+
+    Returns
+    -------
+    numpy.ndarray
+        Absolute surface temperature(s) in Kelvin.
+    """
+    s0 = np.asarray(s0, dtype=float)
+    Ts = ((1.0 - albedo) * s0 / (2.0 * sigma)) ** 0.25
+    return Ts
+
+
+def compare_warming():
+    """
+    Plot model absolute temperature vs. observed model.
+
+    We anchor anomalies to the model's 1950 value (index 1) so both curves are
+    on the same Kelvin scale. 
+    """
+    t_model = temp_1layer(s0=s0)
+
+    baseline_idx = 1
+    t_obs = t_anom + t_model[baseline_idx]
+
+    # --- plotting ---
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.plot(year, t_model, marker='s', label="Predicted Temperature Change")
+    ax.plot(year, t_obs,   marker='o', label="Observed Temperature Change")
+
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Surface Temperature [K]")
+    ax.set_title("Solar-only model vs observed")
+    ax.legend(loc='best')
+    ax.grid(True, linestyle='--', alpha=0.5)
+    fig.tight_layout()
