@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Physical Constants
+# σ: Stefan–Boltzmann constant; used to convert between flux (W m^-2) and temperature (K).
 sigma = 5.67E-8  #Units: W/m2/K-4
 
 def n_layer_atmos(nlayers, epsilon=1, albedo=0.33, s0=1350, debug=False):
@@ -60,10 +61,13 @@ def n_layer_atmos(nlayers, epsilon=1, albedo=0.33, s0=1350, debug=False):
     """
 
     # Create array of coefficients, an N+1xN+1 array:
+    # A: coefficient matrix for longwave balance; b: shortwave forcing vector.
     A = np.zeros([nlayers+1, nlayers+1])
     b = np.zeros(nlayers+1)
 
     # Populate based on our model:
+    # Diagonal: -1 for surface (i=j=0), -2 for atmospheric layers (i=j≥1).
+    # Off-diagonals: ε^(i>0) * (1-ε)^(|i-j|-1) encodes gray absorption + geometric transmission.
     for i in range(nlayers+1):
         for j in range(nlayers+1):
             if i == j:
@@ -73,17 +77,23 @@ def n_layer_atmos(nlayers, epsilon=1, albedo=0.33, s0=1350, debug=False):
     if (debug):
         print(A)
                     
+    # Shortwave source term deposited at the surface only (clear SW atmosphere):
+    # S = S0*(1-α)/4 (global-mean). Negative sign because it moves to RHS of balance.
     b[0] = -0.25 * s0 * (1-albedo)
 
     # Invert matrix:
+    # NOTE: using explicit inverse is fine for small N; np.linalg.solve(A,b) is numerically preferable.
     Ainv = np.linalg.inv(A) 
     # Get solution:
+    # fluxes = [x0, x1, ..., xN] with x0 = σTs^4 and xi = εσTi^4 for i≥1.
     fluxes = np.matmul(Ainv, b)
 
     # Turn fluxes into temperatures
     # Return temperatures to caller.
     # VERIFY!
+    # Surface temperature: Ts uses σ only (blackbody surface).
     Ts = (fluxes[0] / sigma) ** 0.25
+    # Layer temperatures: divide by ε before Stefan–Boltzmann inversion (gray layers).
     if nlayers >= 1 and epsilon > 0:
         T_layers = (fluxes[1:] / (epsilon * sigma)) ** 0.25
         temps = np.concatenate(([Ts], T_layers))
@@ -125,6 +135,7 @@ def n_layer_atmos_sw_at_top(nlayers, epsilon=0.5, albedo=0.33, s0=1350.0):
     temps : np.ndarray, shape (N+1,)
         Temperatures [Ts, T1, ..., TN] in Kelvin.
     """
+    # Internals are identical to the baseline A construction; we only change b's location of -S.
     N = int(nlayers)
     A = np.zeros((N + 1, N + 1))
     b = np.zeros(N + 1)
@@ -139,7 +150,9 @@ def n_layer_atmos_sw_at_top(nlayers, epsilon=0.5, albedo=0.33, s0=1350.0):
     # SW deposited at the top layer (index N); surface gets none
     b[N] = -0.25 * s0 * (1 - albedo)
 
+    # Solve for fluxes
     fluxes = np.linalg.inv(A) @ b
+    # Convert back to temperatures as in the baseline.
     Ts = (fluxes[0] / sigma) ** 0.25
     if N >= 1 and epsilon > 0:
         T_layers = (fluxes[1:] / (epsilon * sigma)) ** 0.25
@@ -171,13 +184,17 @@ def q3_single_layer_emissivity_curve(s0=1350.0, albedo=0.33, target_ts=288.0):
         Creates a Matplotlib figure (shown on screen) and prints the
         ε* that minimizes |Ts(ε) - target_ts| along with the Ts value.
     """
+    # Build a dense ε grid (exclude endpoints to avoid degenerate powers of (1-ε) in A off-diagonals).
     eps_grid = np.linspace(0.001, 0.999, 500)
+    # For each ε on the grid, compute the corresponding surface temperature from the solver.
     Ts_grid = np.array([n_layer_atmos(1, epsilon=e, albedo=albedo, s0=s0)[0] for e in eps_grid])
 
+    # Identify ε* that makes Ts closest to the target value (e.g., 288 K).
     idx_best = int(np.argmin(np.abs(Ts_grid - target_ts)))
     eps_star = float(eps_grid[idx_best])
     Ts_at_star = float(Ts_grid[idx_best])
 
+    # Plot Ts(ε) with a target line for easy visual read-off.
     plt.figure()
     plt.plot(eps_grid, Ts_grid, lw=2)
     plt.axhline(target_ts, ls="--", label=f"Target {target_ts:.0f} K")
@@ -187,6 +204,7 @@ def q3_single_layer_emissivity_curve(s0=1350.0, albedo=0.33, target_ts=288.0):
     plt.legend()
     plt.show()
 
+    # Print the best-fit ε and the achieved Ts for grading and reproducibility logs.
     print("[Q3(a)] epsilon* ~ %.3f -> Ts ~ %.2f K" % (eps_star, Ts_at_star))
 
 
@@ -217,13 +235,16 @@ def q3_fixed_emissivity_layers_curve(epsilon_fixed=0.255, s0=1350.0, albedo=0.33
           2) Temperature–altitude profile for the selected N.
         Prints both the “closest N” and the “minimal N with Ts ≥ target”.
     """
+    # Sweep integer N to construct Ts(N) curve for the fixed ε.
     N_vals = list(range(0, 35))
     Ts_by_N = np.array([n_layer_atmos(N, epsilon=epsilon_fixed, albedo=albedo, s0=s0)[0] for N in N_vals])
 
+    # Closest-to-target and threshold (first N with Ts >= target) criteria.
     idx_closest = int(np.argmin(np.abs(Ts_by_N - target_ts)))
     N_closest = int(N_vals[idx_closest])
     Ts_N_closest = float(Ts_by_N[idx_closest])
 
+    # Plot Ts vs N with a guide line at 288 K.
     plt.figure()
     plt.plot(N_vals, Ts_by_N, marker="o")
     plt.axhline(target_ts, ls="--", label=f"Target {target_ts:.0f} K")
@@ -233,6 +254,7 @@ def q3_fixed_emissivity_layers_curve(epsilon_fixed=0.255, s0=1350.0, albedo=0.33
     plt.legend()
     plt.show()
 
+    # Temperature–altitude profile for the selected N (altitude is illustrative: index-as-height).
     temps_profile = n_layer_atmos(N_closest, epsilon=epsilon_fixed, albedo=albedo, s0=s0)
     alt_km = np.arange(0, N_closest + 1)
     plt.figure()
@@ -242,6 +264,7 @@ def q3_fixed_emissivity_layers_curve(epsilon_fixed=0.255, s0=1350.0, albedo=0.33
     plt.title(f"Q3(b): Altitude Profile (ε={epsilon_fixed}, N={N_closest})")
     plt.show()
 
+    # also report the minimal N giving Ts >= target (if different)
     N_ge = next((int(N) for N, Ts in zip(N_vals, Ts_by_N) if Ts >= target_ts), None)
     print("[Q3(b)] closest N = %d (Ts ~ %.2f K); minimal N with Ts ≥ %.0f K: %s"
           % (N_closest, Ts_N_closest, target_ts, str(N_ge)))
@@ -275,16 +298,20 @@ def q4_ts_vs_layers_curve(s0=2600.0, albedo=0.75, target_ts=700.0, Nmax=120, tit
           • the N with Ts closest to the target,
           • the minimal N with Ts ≥ target.
     """
+    # Perfect LW absorption ε=1 ⇒ strongest greenhouse amplification with N.
     epsilon = 1.0
+    # Build Ts(N) by sweeping layer counts up to Nmax.
     N_vals = list(range(0, Nmax + 1))
     Ts_by_N = np.array([n_layer_atmos(N, epsilon=epsilon, albedo=albedo, s0=s0)[0] for N in N_vals])
 
+    # Locate both the closest-to-target N and the minimal N achieving the target.
     idx_closest = int(np.argmin(np.abs(Ts_by_N - target_ts)))
     N_closest = int(N_vals[idx_closest])
     Ts_closest = float(Ts_by_N[idx_closest])
 
     N_ge = next((int(N) for N, Ts in zip(N_vals, Ts_by_N) if Ts >= target_ts), None)
 
+    # Plot Ts vs N with a 700 K guide line for Venus.
     plt.figure()
     plt.plot(N_vals, Ts_by_N, marker="o")
     plt.axhline(target_ts, ls="--", label=f"Target {target_ts:.0f} K")
@@ -294,6 +321,7 @@ def q4_ts_vs_layers_curve(s0=2600.0, albedo=0.75, target_ts=700.0, Nmax=120, tit
     plt.legend()
     plt.show()
 
+    # Print both criteria for clarity in grading
     print("[Q4] %s (α=%.2f): closest N = %d (Ts ~ %.2f K); minimal N with Ts ≥ %.0f K: %s"
           % (title_note, albedo, N_closest, Ts_closest, target_ts, str(N_ge)))
 
@@ -322,9 +350,12 @@ def q5_nuclear_winter_profile(nlayers=5, epsilon=0.5, s0=1350.0, albedo=0.33):
         Produces a Matplotlib figure of temperature vs (layer index) altitude
         and prints the surface temperature in K and °C.
     """
+    # Solve the nuclear-winter variant: SW energy deposited at the topmost layer only.
     temps = n_layer_atmos_sw_at_top(nlayers, epsilon=epsilon, albedo=albedo, s0=s0)
+    # Altitude is an illustrative index (0..N); used for a clean profile plot.
     alt_km = np.arange(0, nlayers + 1)
 
+    # Plot vertical profile: expect cold surface, warm top, near-flat interior for uniform ε.
     plt.figure()
     plt.plot(temps, alt_km, marker="o")
     plt.xlabel("Temperature (K)")
@@ -332,6 +363,7 @@ def q5_nuclear_winter_profile(nlayers=5, epsilon=0.5, s0=1350.0, albedo=0.33):
     plt.title(f"Q5: Nuclear Winter Profile (N={nlayers}, ε={epsilon}, S0={s0}, α={albedo})")
     plt.show()
 
+    # Print surface temperature in both K and °C
     print("[Q5] Nuclear winter: surface Ts ~ %.2f K  (%.1f °C)"
           % (temps[0], temps[0] - 273.15))
 
@@ -339,11 +371,15 @@ def q5_nuclear_winter_profile(nlayers=5, epsilon=0.5, s0=1350.0, albedo=0.33):
 # ---------------------- Run -----------------------------
 if __name__ == "__main__":
     # Q3
+    # 3(a): One-layer ε sweep to find ε* giving Ts≈288 K.
     q3_single_layer_emissivity_curve(s0=1350.0, albedo=0.33, target_ts=288.0)
+    # 3(b): Fixed ε=0.255, vary N to locate (closest) and (minimal) N near Ts=288 K; also show profile.
     q3_fixed_emissivity_layers_curve(epsilon_fixed=0.255, s0=1350.0, albedo=0.33, target_ts=288.0)
 
     # Q4
+    # Venus-like run: ε=1, S0=2600, α=0.75; find N for Ts≈700 K and plot the Ts–N curve.
     q4_ts_vs_layers_curve(s0=2600.0, albedo=0.75, target_ts=700.0, Nmax=120, title_note="Venus")
 
     # Q5
+    # Nuclear-winter scenario: top-absorbing SW, ε=0.5; plot the cold-surface / warm-top profile.
     q5_nuclear_winter_profile(nlayers=5, epsilon=0.5, s0=1350.0, albedo=0.33)
