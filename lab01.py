@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 
 '''
-This files solves the N-layer atmosphere problem for Lab 01.
+Lab 01 — N-layer gray-atmosphere model (Q1-Q5)
 
+How to run:
+    $ python3 lab01.py
+
+This will compute and display the figures for Q3-Q5 and print key values (e.g., Ts).
+To import the solver:
+    >>> from lab01 import n_layer_atmos
+    >>> n_layer_atmos(1, epsilon=1.0, albedo=0.33, s0=1350.0)
 '''
 
 import numpy as np
