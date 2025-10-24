@@ -294,7 +294,7 @@ def reach_periodic_steady_state(cfg: SimpleNamespace) -> SimpleNamespace:
         yr_summer_0C     : annual summer 0°C depths (diagnostic)
         yr_winter_0C     : annual winter 0°C depths (diagnostic)
     """
-    # Unpack configuration
+
     H          = cfg.x_max
     dx         = cfg.dx
     dt_days    = cfg.dt_days
@@ -303,7 +303,7 @@ def reach_periodic_steady_state(cfg: SimpleNamespace) -> SimpleNamespace:
     tol        = cfg.steady_tol_C
     z_min      = cfg.steady_min_depth_m
     max_years  = cfg.max_years
-    year_days  = cfg.year_days  # 365
+    year_days  = cfg.year_days  
 
     # Space grid
     M = int(H / dx) + 1
@@ -436,7 +436,7 @@ if __name__ == "__main__":
     active_layer_depth = linear_zero_cross_depth(summer_last, OUT.x)
     permafrost_bottom  = linear_zero_cross_depth(winter_last, OUT.x)
 
-    plt.figure(num="Fig 3 – Seasonal profiles (last year)", figsize=(8.6, 6.3))
+    plt.figure(num="Fig 3 - Seasonal profiles (last year)", figsize=(8.6, 6.3))
     plt.plot(winter_last, OUT.x, label="Winter (min over last year)")
     plt.plot(summer_last, OUT.x, linestyle="--", label="Summer (max over last year)")
     plt.axvline(0.0, color='k', linewidth=1.0, alpha=0.6)
@@ -718,12 +718,12 @@ def plot_seasonal_profile(x, winter, summer, title_suffix, xlim=(-25, 10), ylim=
     bottom = linear_zero_cross_depth(winter, x)
     thickness = bottom - active if np.isfinite(active) and np.isfinite(bottom) else np.nan
 
-    plt.figure()  # keep your original figure size
+    plt.figure()  
     plt.plot(winter, x, label="Winter (min over last year)", linewidth=2) 
     plt.plot(summer, x, '--', label="Summer (max over last year)", linewidth=2)
     plt.axvline(0.0, color='k', lw=1.0, alpha=0.7)
     plt.xlim(*xlim)
-    plt.ylim(*ylim)                        # keep (0, 100)
+    plt.ylim(*ylim)                        
     plt.gca().invert_yaxis()               
     plt.xlabel("Temperature (°C)", fontsize=15)
     plt.ylabel("Depth (m)", fontsize=15)
