@@ -164,7 +164,7 @@ def plot_heatsolve(t, x, U, title=None, **kwargs):
 
     return fig, ax, cbar
 
-# 1) Run the solver with the Q1 benchmark setup (defaults match the prompt)
+# 1) Run the solver with the Q1 benchmark setup
 t, x, U = solve_heat()
 
 # 2) Compare to the provided solution: max-norm error and allclose() test
@@ -212,7 +212,7 @@ T_KANGER = np.array([
 def temp_kanger(t_days: np.ndarray) -> np.ndarray:
     """
     Continuous surface temperature forcing (°C) for Kangerlussuaq.
-    Matches the handout: amp * sin(pi/180 * t − pi/2) + mean.
+    Matches the handout: amp * sin(pi/180 * t - pi/2) + mean.
     We treat one climatic year as 365 days for indexing the last-year envelopes.
     """
     t_amp = (T_KANGER - T_KANGER.mean()).max()
@@ -503,7 +503,7 @@ if __name__ == "__main__":
     plt.gca().invert_yaxis()
     plt.tight_layout()
 
-    # ----------- Print Q2 answers and figure mapping -----------
+    # ----------- Q2 answers -----------
     print("\n=== Q2 Outputs (steady state) ===")
     print(f"Years to reach steady state (first year below tolerance): {OUT.years_to_steady:.0f} years")
     print(f"Active layer depth (summer 0°C crossing, last year):       {active_layer_depth:.2f} m")
@@ -516,7 +516,6 @@ if __name__ == "__main__":
     print("Fig 3: Seasonal profiles (last year) — used to read active layer and permafrost depths.")
     print("Fig 4: 0°C depth trajectories — optional convergence view over years.")
 
-    # Show all figures
     plt.show()
 
 
@@ -561,7 +560,7 @@ T_KANGER = np.array([
 def temp_kanger(t_days: np.ndarray) -> np.ndarray:
     """
     Continuous surface temperature forcing (°C) for Kangerlussuaq,
-    as in the handout: amp * sin(pi/180 * t − pi/2) + mean.
+    as in the handout: amp * sin(pi/180 * t - pi/2) + mean.
     """
     t_amp = (T_KANGER - T_KANGER.mean()).max()
     return t_amp * np.sin(np.pi/180.0 * t_days - np.pi/2.0) + T_KANGER.mean()
@@ -719,28 +718,27 @@ def plot_seasonal_profile(x, winter, summer, title_suffix, xlim=(-25, 10), ylim=
     bottom = linear_zero_cross_depth(winter, x)
     thickness = bottom - active if np.isfinite(active) and np.isfinite(bottom) else np.nan
 
-    plt.figure(figsize=(7.8, 6.2))
-    plt.plot(winter, x, label="Winter (min over last year)")
-    plt.plot(summer, x, '--', label="Summer (max over last year)")
+    plt.figure()  # keep your original figure size
+    plt.plot(winter, x, label="Winter (min over last year)", linewidth=2) 
+    plt.plot(summer, x, '--', label="Summer (max over last year)", linewidth=2)
     plt.axvline(0.0, color='k', lw=1.0, alpha=0.7)
     plt.xlim(*xlim)
-    plt.ylim(*ylim)
-    plt.gca().invert_yaxis()
-    plt.xlabel("Temperature (°C)")
-    plt.ylabel("Depth (m)")
-    plt.title(f"Seasonal Profiles (Last Steady Year) — {title_suffix}")
-    plt.legend(loc="lower left")
+    plt.ylim(*ylim)                        # keep (0, 100)
+    plt.gca().invert_yaxis()               
+    plt.xlabel("Temperature (°C)", fontsize=15)
+    plt.ylabel("Depth (m)", fontsize=15)
+    plt.title(f"Seasonal Profiles (Last Steady Year) — {title_suffix}", fontsize=18)
+    plt.legend(loc="lower left", fontsize=13)
 
-    # Annotations
     if np.isfinite(active):
         plt.hlines(active, xlim[0], 0, colors='gray', linestyles=':', lw=1.0)
-        plt.text(xlim[0] + 1, active, f"Active layer ≈ {active:.2f} m", va='center')
+        plt.text(xlim[0] + 1, active, f"Active layer ≈ {active:.2f} m", va='center', fontsize=14)
     if np.isfinite(bottom):
         plt.hlines(bottom, xlim[0], 0, colors='gray', linestyles=':', lw=1.0)
-        plt.text(xlim[0] + 1, bottom, f"Permafrost bottom ≈ {bottom:.2f} m", va='center')
+        plt.text(xlim[0] + 1, bottom, f"Permafrost bottom ≈ {bottom:.2f} m", va='center', fontsize=14)
     if np.isfinite(active) and np.isfinite(bottom):
         plt.text(xlim[0] + 1, (active + bottom)/2,
-                 f"Thickness ≈ {thickness:.2f} m", va='center', fontsize=10)
+                 f"Thickness ≈ {thickness:.2f} m", va='center', fontsize=14)
 
     plt.tight_layout()
     return active, bottom, thickness
