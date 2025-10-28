@@ -16,6 +16,7 @@ $ python3 lab03.py
 
 import numpy as np
 import matplotlib.pyplot as plt
+from types import SimpleNamespace
 
 plt.style.use('fivethirtyeight')
 
@@ -164,17 +165,6 @@ def plot_heatsolve(t, x, U, title=None, **kwargs):
 
     return fig, ax, cbar
 
-# 1) Run the solver with the Q1 benchmark setup
-t, x, U = solve_heat()
-
-# 2) Compare to the provided solution: max-norm error and allclose() test
-max_err = np.max(np.abs(U - sol10p3))
-ok = np.allclose(U, sol10p3, atol=1e-3)
-
-print(f"Q1 validation -> max |error| = {max_err:.6f}, allclose={ok}")
-
-
-
 """
 Q2 — Heat diffusion & permafrost (Kangerlussuaq, Greenland)
 
@@ -189,10 +179,6 @@ Purpose
     Fig 3 - Seasonal envelopes (winter min, summer max) in the final year
     Fig 4 - Heatmap from t=0 to the first steady year (full-history view)
 """
-
-import numpy as np
-import matplotlib.pyplot as plt
-from types import SimpleNamespace
 
 # -----------------------------
 # Physical constants and surface forcing (from the handout)
@@ -252,7 +238,7 @@ def linear_zero_cross_depth(profile: np.ndarray, depths: np.ndarray) -> float:
 # One-year march + steady-state driver
 # -----------------------------
 
-def run_one_year(U0: np.ndarray, depths: np.ndarray, day0: float,
+def run_one_year_q2(U0: np.ndarray, depths: np.ndarray, day0: float,
                  dx: float, dt_days: float, c2: float,
                  bottom_const_C: float, year_days: int) -> np.ndarray:
     """
@@ -279,7 +265,7 @@ def run_one_year(U0: np.ndarray, depths: np.ndarray, day0: float,
 
     return U
 
-def reach_periodic_steady_state(cfg: SimpleNamespace) -> SimpleNamespace:
+def reach_periodic_steady_state_q2(cfg: SimpleNamespace) -> SimpleNamespace:
     """
     March year by year from U(x,0)=0°C until the deep-zone (≥60 m) year-to-year
     maximum absolute difference falls below a specified tolerance.
@@ -331,7 +317,7 @@ def reach_periodic_steady_state(cfg: SimpleNamespace) -> SimpleNamespace:
 
     for k in range(1, max_years + 1):
         # Simulate one climatic year
-        U_year = run_one_year(U_state, x, day0=total_days, dx=dx, dt_days=dt_days,
+        U_year = run_one_year_q2(U_state, x, day0=total_days, dx=dx, dt_days=dt_days,
                               c2=c2, bottom_const_C=bottom_C, year_days=year_days)
         total_days += year_days
         U_state = U_year[:, -1].copy()
@@ -380,144 +366,6 @@ def reach_periodic_steady_state(cfg: SimpleNamespace) -> SimpleNamespace:
         yr_winter_0C=yr_winter_0C
     )
 
-# -----------------------------
-# Main: run, plot, and print
-# -----------------------------
-if __name__ == "__main__":
-    # Configuration (365-day year indexing as in the handout)
-    cfg = SimpleNamespace(
-        x_max=100.0,          # depth domain: 0–100 m
-        dx=0.5,               # spatial step (m)
-        dt_days=1.0,          # time step (days)
-        c2=C2,                # m^2/day
-        bottom_C=5.0,         # geothermal BC at 100 m
-        steady_tol_C=0.01,    # deep-zone tolerance (°C)
-        steady_min_depth_m=60.0,
-        max_years=500,        # safety cap
-        year_days=365         # length of a climatic year
-    )
-
-    # Run to periodic steady state and collect outputs
-    OUT = reach_periodic_steady_state(cfg)
-
-    # ----------- Fig 1: Deep-zone year-to-year max difference -----------
-    plt.ioff()  # keep figures separate
-    plt.figure(num="Fig 1 – Deep-zone year-to-year max ΔT", figsize=(8.5, 5.3))
-    years_axis = np.arange(2, 2 + len(OUT.y2y_metric))  # first diff is year 2 vs 1
-    if len(years_axis) > 0:
-        plt.plot(years_axis, OUT.y2y_metric, marker='o', linewidth=1.6, label="Max |ΔT| (depth ≥ 60 m)")
-    plt.axhline(cfg.steady_tol_C, linestyle='--', linewidth=1.2, color='tab:red',
-                label=f"Tolerance = {cfg.steady_tol_C} °C")
-    plt.axvline(OUT.years_to_steady, linestyle=':', linewidth=1.2, color='k',
-                label=f"First year below tol = {OUT.years_to_steady:.0f}")
-    plt.title("Deep-Zone Year-to-Year Max Difference (Steady-State Criterion)")
-    plt.xlabel("Year")
-    plt.ylabel("Max |ΔT| over depth ≥ 60 m (°C)")
-    plt.legend()
-    plt.tight_layout()
-
-    # ----------- Fig 2: Heatmap (steady-state window: last 5 years) -----------
-    plt.figure(num="Fig 2 – Heatmap (steady-state window)", figsize=(9.6, 6.6))
-    pc = plt.pcolor(OUT.t_window_years, OUT.x, OUT.U_window,
-                    cmap='seismic', vmin=-25, vmax=25)
-    plt.colorbar(pc, label="Temperature (°C)")
-    plt.title("Ground Temperature: Kangerlussuaq, Greenland (Steady-State Window)")
-    plt.xlabel("Time (Years)")
-    plt.ylabel("Depth (m)")
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-
-    # ----------- Fig 3: Seasonal profiles (last year at steady state) -----------
-    # Seasonal envelopes (winter=min, summer=max) from the last simulated year
-    winter_last = OUT.U_last_year[:, 1:].min(axis=1)
-    summer_last = OUT.U_last_year[:, 1:].max(axis=1)
-
-    # 0°C crossing depths for the last year (active layer top & permafrost bottom)
-    active_layer_depth = linear_zero_cross_depth(summer_last, OUT.x)
-    permafrost_bottom  = linear_zero_cross_depth(winter_last, OUT.x)
-
-    plt.figure(num="Fig 3 - Seasonal profiles (last year)", figsize=(8.6, 6.3))
-    plt.plot(winter_last, OUT.x, label="Winter (min over last year)")
-    plt.plot(summer_last, OUT.x, linestyle="--", label="Summer (max over last year)")
-    plt.axvline(0.0, color='k', linewidth=1.0, alpha=0.6)
-    # Annotate depth markers if defined
-    if np.isfinite(active_layer_depth):
-        plt.hlines(active_layer_depth,
-                   xmin=min(winter_last.min(), summer_last.min()),
-                   xmax=0.0, colors='gray', linestyles=':', linewidth=1.0)
-        plt.text(0.02, active_layer_depth,
-                 f"Active layer depth ≈ {active_layer_depth:.2f} m", va='center')
-    if np.isfinite(permafrost_bottom):
-        plt.hlines(permafrost_bottom,
-                   xmin=min(winter_last.min(), summer_last.min()),
-                   xmax=0.0, colors='gray', linestyles=':', linewidth=1.0)
-        plt.text(0.02, permafrost_bottom,
-                 f"Permafrost bottom ≈ {permafrost_bottom:.2f} m", va='center')
-    plt.title("Seasonal Temperature Profiles (Last Year at Steady State)")
-    plt.xlabel("Temperature (°C)")
-    plt.ylabel("Depth (m)")
-    plt.gca().invert_yaxis()
-    plt.legend(loc="best")
-    plt.tight_layout()
-
-    # ----------- Fig 4: Heatmap from t=0 to first steady year -----------
-    # Reconstruct full history up to the detected steady year
-    steady_year = int(np.ceil(OUT.years_to_steady))
-
-    M = int(cfg.x_max / cfg.dx) + 1
-    x_full = np.linspace(0.0, cfg.x_max, M)
-    U_state = np.zeros(M)
-
-    dt = cfg.dt_days
-    steps_per_year = int(cfg.year_days / dt)
-    total_steps = steady_year * steps_per_year
-
-    U_hist = np.zeros((M, total_steps + 1))
-    U_hist[:, 0] = U_state
-    t_hist_days = np.zeros(total_steps + 1)
-
-    day0 = 0.0
-    col = 0
-    for y in range(steady_year):
-        U_year = run_one_year(
-            U0=U_state, depths=x_full, day0=day0,
-            dx=cfg.dx, dt_days=cfg.dt_days, c2=cfg.c2,
-            bottom_const_C=cfg.bottom_C, year_days=cfg.year_days
-        )
-        steps = U_year.shape[1] - 1
-        U_hist[:, col + 1: col + 1 + steps] = U_year[:, 1:]
-        t_hist_days[col + 1: col + 1 + steps] = day0 + np.arange(1, steps + 1) * dt
-
-        day0 += cfg.year_days
-        col += steps
-        U_state = U_year[:, -1].copy()
-
-    t_hist_years = t_hist_days / cfg.year_days
-
-    plt.figure(num="Fig 4 – Heatmap (0 to steady year)", figsize=(10.0, 6.5))
-    pc = plt.pcolor(t_hist_years, x_full, U_hist, cmap='seismic', vmin=-25, vmax=25)
-    plt.colorbar(pc, label="Temperature (°C)")
-    plt.title("Ground Temperature: Kangerlussuaq, Greenland (0 to first steady year)")
-    plt.xlabel("Time (Years)")
-    plt.ylabel("Depth (m)")
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-
-    # ----------- Q2 answers -----------
-    print("\n=== Q2 Outputs (steady state) ===")
-    print(f"Years to reach steady state (first year below tolerance): {OUT.years_to_steady:.0f} years")
-    print(f"Active layer depth (summer 0°C crossing, last year):       {active_layer_depth:.2f} m")
-    print(f"Permafrost top (same as active layer depth):               {active_layer_depth:.2f} m")
-    print(f"Permafrost bottom (winter 0°C crossing, last year):        {permafrost_bottom:.2f} m")
-
-    print("\n[Figure mapping]")
-    print("Fig 1: Steady-state criterion — deep-zone year-to-year max difference vs. year.")
-    print("Fig 2: Heatmap (steady-state window) — last 5 years after steady state.")
-    print("Fig 3: Seasonal profiles (last year) — used to read active layer and permafrost depths.")
-    print("Fig 4: 0°C depth trajectories — optional convergence view over years.")
-
-    plt.show()
-
 
 
 """
@@ -538,32 +386,9 @@ Purpose
 All plots are displayed with plt.show().
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-from types import SimpleNamespace
-
-# -----------------------------
-# Physical constants & forcing (as in Q2)
-# -----------------------------
-
-# Permafrost thermal diffusivity: 0.25 mm^2/s = 0.25e-6 m^2/s
-# Convert to m^2/day to match the day-based time step.
-C2_M2_PER_S = 0.25e-6
-C2 = C2_M2_PER_S * 86400.0  # ≈ 0.0216 m^2/day
-
-# Monthly climatology for Kangerlussuaq (provided)
-T_KANGER = np.array([
-    -19.7, -21.0, -17.0, -8.4,  2.3,  8.4,
-     10.7,   8.5,   3.1, -6.0, -12.0, -16.9
-])
-
-def temp_kanger(t_days: np.ndarray) -> np.ndarray:
-    """
-    Continuous surface temperature forcing (°C) for Kangerlussuaq,
-    as in the handout: amp * sin(pi/180 * t - pi/2) + mean.
-    """
-    t_amp = (T_KANGER - T_KANGER.mean()).max()
-    return t_amp * np.sin(np.pi/180.0 * t_days - np.pi/2.0) + T_KANGER.mean()
+# # -----------------------------
+# # Physical constants & forcing (as in Q2)
+# # -----------------------------
 
 def temp_kanger_shifted(t_days: np.ndarray, dT: float) -> np.ndarray:
     """Apply a uniform warming shift ΔT (°C) to the surface temperature."""
@@ -600,7 +425,7 @@ def linear_zero_cross_depth(profile: np.ndarray, depths: np.ndarray) -> float:
 # Core solver (year march + steady-state detection)
 # -----------------------------
 
-def run_one_year(U0: np.ndarray, depths: np.ndarray, day0: float,
+def run_one_year_q3(U0: np.ndarray, depths: np.ndarray, day0: float,
                  dx: float, dt_days: float, c2: float,
                  bottom_const_C: float, year_days: int,
                  surface_fun) -> np.ndarray:
@@ -625,7 +450,7 @@ def run_one_year(U0: np.ndarray, depths: np.ndarray, day0: float,
 
     return U
 
-def reach_periodic_steady_state(cfg: SimpleNamespace, dT: float) -> SimpleNamespace:
+def reach_periodic_steady_state_q3(cfg: SimpleNamespace, dT: float) -> SimpleNamespace:
     """
     Starting from U(x,0)=0 °C, march year by year with a uniform surface shift ΔT,
     until the deep-zone (≥60 m) year-to-year max |ΔT| is below the tolerance.
@@ -662,7 +487,7 @@ def reach_periodic_steady_state(cfg: SimpleNamespace, dT: float) -> SimpleNamesp
     surf = lambda t: temp_kanger_shifted(t, dT)
 
     for k in range(1, max_years + 1):
-        U_year = run_one_year(U_state, x, day0=total_days, dx=dx, dt_days=dt,
+        U_year = run_one_year_q3(U_state, x, day0=total_days, dx=dx, dt_days=dt,
                               c2=c2, bottom_const_C=bottom_C, year_days=year_days,
                               surface_fun=surf)
         total_days += year_days
@@ -744,9 +569,155 @@ def plot_seasonal_profile(x, winter, summer, title_suffix, xlim=(-25, 10), ylim=
     return active, bottom, thickness
 
 # -----------------------------
-# Main (Q3)
+# Main (For all)
 # -----------------------------
 if __name__ == "__main__":
+    # Question 1
+    # 1) Run the solver with the Q1 benchmark setup
+    t, x, U = solve_heat()
+
+    # 2) Compare to the provided solution: max-norm error and allclose() test
+    max_err = np.max(np.abs(U - sol10p3))
+    ok = np.allclose(U, sol10p3, atol=1e-3)
+
+    print(f"Q1 validation -> max |error| = {max_err:.6f}, allclose={ok}")
+
+    # Question 2
+    # Configuration (365-day year indexing as in the handout)
+    cfg = SimpleNamespace(
+        x_max=100.0,          # depth domain: 0–100 m
+        dx=0.5,               # spatial step (m)
+        dt_days=1.0,          # time step (days)
+        c2=C2,                # m^2/day
+        bottom_C=5.0,         # geothermal BC at 100 m
+        steady_tol_C=0.01,    # deep-zone tolerance (°C)
+        steady_min_depth_m=60.0,
+        max_years=500,        # safety cap
+        year_days=365         # length of a climatic year
+    )
+
+    # Run to periodic steady state and collect outputs
+    OUT = reach_periodic_steady_state_q2(cfg)
+
+    # ----------- Fig 1: Deep-zone year-to-year max difference -----------
+    plt.ioff()  # keep figures separate
+    plt.figure(num="Fig 1 – Deep-zone year-to-year max ΔT", figsize=(8.5, 5.3))
+    years_axis = np.arange(2, 2 + len(OUT.y2y_metric))  # first diff is year 2 vs 1
+    if len(years_axis) > 0:
+        plt.plot(years_axis, OUT.y2y_metric, marker='o', linewidth=1.6, label="Max |ΔT| (depth ≥ 60 m)")
+    plt.axhline(cfg.steady_tol_C, linestyle='--', linewidth=1.2, color='tab:red',
+                label=f"Tolerance = {cfg.steady_tol_C} °C")
+    plt.axvline(OUT.years_to_steady, linestyle=':', linewidth=1.2, color='k',
+                label=f"First year below tol = {OUT.years_to_steady:.0f}")
+    plt.title("Deep-Zone Year-to-Year Max Difference (Steady-State Criterion)")
+    plt.xlabel("Year")
+    plt.ylabel("Max |ΔT| over depth ≥ 60 m (°C)")
+    plt.legend()
+    plt.tight_layout()
+
+    # ----------- Fig 2: Heatmap (steady-state window: last 5 years) -----------
+    plt.figure(num="Fig 2 – Heatmap (steady-state window)", figsize=(9.6, 6.6))
+    pc = plt.pcolor(OUT.t_window_years, OUT.x, OUT.U_window,
+                    cmap='seismic', vmin=-25, vmax=25)
+    plt.colorbar(pc, label="Temperature (°C)")
+    plt.title("Ground Temperature: Kangerlussuaq, Greenland (Steady-State Window)")
+    plt.xlabel("Time (Years)")
+    plt.ylabel("Depth (m)")
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+
+    # ----------- Fig 3: Seasonal profiles (last year at steady state) -----------
+    # Seasonal envelopes (winter=min, summer=max) from the last simulated year
+    winter_last = OUT.U_last_year[:, 1:].min(axis=1)
+    summer_last = OUT.U_last_year[:, 1:].max(axis=1)
+
+    # 0°C crossing depths for the last year (active layer top & permafrost bottom)
+    active_layer_depth = linear_zero_cross_depth(summer_last, OUT.x)
+    permafrost_bottom  = linear_zero_cross_depth(winter_last, OUT.x)
+
+    plt.figure(num="Fig 3 - Seasonal profiles (last year)", figsize=(8.6, 6.3))
+    plt.plot(winter_last, OUT.x, label="Winter (min over last year)")
+    plt.plot(summer_last, OUT.x, linestyle="--", label="Summer (max over last year)")
+    plt.axvline(0.0, color='k', linewidth=1.0, alpha=0.6)
+    # Annotate depth markers if defined
+    if np.isfinite(active_layer_depth):
+        plt.hlines(active_layer_depth,
+                   xmin=min(winter_last.min(), summer_last.min()),
+                   xmax=0.0, colors='gray', linestyles=':', linewidth=1.0)
+        plt.text(0.02, active_layer_depth,
+                 f"Active layer depth ≈ {active_layer_depth:.2f} m", va='center')
+    if np.isfinite(permafrost_bottom):
+        plt.hlines(permafrost_bottom,
+                   xmin=min(winter_last.min(), summer_last.min()),
+                   xmax=0.0, colors='gray', linestyles=':', linewidth=1.0)
+        plt.text(0.02, permafrost_bottom,
+                 f"Permafrost bottom ≈ {permafrost_bottom:.2f} m", va='center')
+    plt.title("Seasonal Temperature Profiles (Last Year at Steady State)")
+    plt.xlabel("Temperature (°C)")
+    plt.ylabel("Depth (m)")
+    plt.gca().invert_yaxis()
+    plt.legend(loc="best")
+    plt.tight_layout()
+
+    # ----------- Fig 4: Heatmap from t=0 to first steady year -----------
+    # Reconstruct full history up to the detected steady year
+    steady_year = int(np.ceil(OUT.years_to_steady))
+
+    M = int(cfg.x_max / cfg.dx) + 1
+    x_full = np.linspace(0.0, cfg.x_max, M)
+    U_state = np.zeros(M)
+
+    dt = cfg.dt_days
+    steps_per_year = int(cfg.year_days / dt)
+    total_steps = steady_year * steps_per_year
+
+    U_hist = np.zeros((M, total_steps + 1))
+    U_hist[:, 0] = U_state
+    t_hist_days = np.zeros(total_steps + 1)
+
+    day0 = 0.0
+    col = 0
+    for y in range(steady_year):
+        U_year = run_one_year_q2(
+            U0=U_state, depths=x_full, day0=day0,
+            dx=cfg.dx, dt_days=cfg.dt_days, c2=cfg.c2,
+            bottom_const_C=cfg.bottom_C, year_days=cfg.year_days
+        )
+        steps = U_year.shape[1] - 1
+        U_hist[:, col + 1: col + 1 + steps] = U_year[:, 1:]
+        t_hist_days[col + 1: col + 1 + steps] = day0 + np.arange(1, steps + 1) * dt
+
+        day0 += cfg.year_days
+        col += steps
+        U_state = U_year[:, -1].copy()
+
+    t_hist_years = t_hist_days / cfg.year_days
+
+    plt.figure(num="Fig 4 – Heatmap (0 to steady year)", figsize=(10.0, 6.5))
+    pc = plt.pcolor(t_hist_years, x_full, U_hist, cmap='seismic', vmin=-25, vmax=25)
+    plt.colorbar(pc, label="Temperature (°C)")
+    plt.title("Ground Temperature: Kangerlussuaq, Greenland (0 to first steady year)")
+    plt.xlabel("Time (Years)")
+    plt.ylabel("Depth (m)")
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+
+    # ----------- Q2 answers -----------
+    print("\n=== Q2 Outputs (steady state) ===")
+    print(f"Years to reach steady state (first year below tolerance): {OUT.years_to_steady:.0f} years")
+    print(f"Active layer depth (summer 0°C crossing, last year):       {active_layer_depth:.2f} m")
+    print(f"Permafrost top (same as active layer depth):               {active_layer_depth:.2f} m")
+    print(f"Permafrost bottom (winter 0°C crossing, last year):        {permafrost_bottom:.2f} m")
+
+    print("\n[Figure mapping]")
+    print("Fig 1: Steady-state criterion — deep-zone year-to-year max difference vs. year.")
+    print("Fig 2: Heatmap (steady-state window) — last 5 years after steady state.")
+    print("Fig 3: Seasonal profiles (last year) — used to read active layer and permafrost depths.")
+    print("Fig 4: 0°C depth trajectories — optional convergence view over years.")
+
+    plt.show()
+
+    # Question 3
     # Shared configuration (same as Q2; only the surface is shifted by ΔT)
     cfg = SimpleNamespace(
         x_max=100.0,         # depth domain (m)
@@ -773,7 +744,7 @@ if __name__ == "__main__":
     results = {}
 
     for dT in deltas:
-        OUT = reach_periodic_steady_state(cfg, dT=dT)
+        OUT = reach_periodic_steady_state_q3(cfg, dT=dT)
         results[dT] = OUT
 
         # Fig A/B/C: seasonal profiles at the last steady year
