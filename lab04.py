@@ -12,7 +12,7 @@ Q3: a disease-spread analog using the same grid structure.
 
 How to run everything
 ---------------------
-$ python3 lab03.py
+$ python3 lab04.py
     - Generates the full set of figures for Q1-Q3 in sequence.
 """
 
