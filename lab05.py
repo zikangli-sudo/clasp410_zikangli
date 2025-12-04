@@ -2,11 +2,6 @@
 
 '''
 Lab 5: Snowball Earth - Energy Balance Model and Stability Analysis.
-- Core Physics Components:
-  * Diffusion: Meridional heat transport (Implicit solver)
-  * Spherical Correction: Accounting for latitudinal area changes
-  * Radiative Forcing: Insolation (Shortwave) - Blackbody Cooling (Longwave)
-  * Albedo Feedback: Dynamic switching (0.3 <-> 0.6) at T = -10°C
 
 This script implements the full numerical pipeline used in the lab:
 Q1: Solver validation (Diffusion only -> +Spherical -> +Radiative).
@@ -616,4 +611,5 @@ if __name__ == '__main__':
     problem2()
     find_absolute_minimum()
     problem3()
+
     problem4()
