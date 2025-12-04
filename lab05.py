@@ -4,10 +4,10 @@
 Lab 5: Snowball Earth - Energy Balance Model and Stability Analysis.
 
 This script implements the full numerical pipeline used in the lab:
-Q1: Solver validation (Diffusion only -> +Spherical -> +Radiative).
-Q2: Parameter tuning (finding best lambda & epsilon to match Warm Earth).
-Q3: Stability analysis using extreme initial conditions (Hot vs. Cold vs. Flash-freeze).
-Q4: Hysteresis loop analysis (Varying solar multiplier gamma to find tipping points).
+Q1: Solver validation.
+Q2: Parameter tuning.
+Q3: Stability analysis using extreme initial conditions.
+Q4: Hysteresis loop analysis.
 
 How to run everything
 ---------------------
