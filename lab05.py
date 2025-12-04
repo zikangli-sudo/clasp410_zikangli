@@ -363,7 +363,7 @@ def find_absolute_minimum():
     Scans a dense grid of parameters to find the absolute lowest RMSE.
     Ranges based on your previous plots:
     - lam: 20 to 50 (Scanning for higher diffusivity)
-    - emiss: 0.68 to 0.78 (Scanning for stronger greenhouse)
+    - emiss: 0.6 to 0.8 (Scanning for stronger greenhouse)
     '''
     print("\n--- Running Automatic Optimizer... Please wait ---")
     
@@ -374,8 +374,8 @@ def find_absolute_minimum():
     # 2. Define Search Grid (Dense Scan)
     # lam: check every integer from 20 to 50
     lam_range = np.arange(20, 51, 1) 
-    # emiss: check every 0.005 from 0.68 to 0.78
-    emiss_range = np.arange(0.68, 0.78, 0.005)
+    # emiss: check every 0.005 from 0.6 to 0.8
+    emiss_range = np.arange(0.6, 0.8, 0.005)
     
     best_rmse = 9999.0
     best_lam = -1
@@ -497,108 +497,85 @@ def problem3():
     plt.show()
 
 
-# =============================================================================
-# PROBLEM 4: Hysteresis Loop (Solar Forcing)
-# =============================================================================
-
 def problem4():
     '''
     Problem 4: The Hysteresis Loop.
-    Vary solar multiplier (gamma) from 1.4 down to 0.4, then back up to 1.4.
-    Plot Average Global Temperature vs. Gamma.
+    Vary solar multiplier (gamma) from 0.4 up to 1.4 and back to 0.4,
+    following the lab handout: start from a cold Earth at gamma=0.4,
+    warm to 1.4, then turn around and cool back to 0.4.
     '''
     print("\n--- Running Problem 4 (Hysteresis Loop) ---")
     print("This will take a moment (running many simulations)...")
 
-    # 1. Use best parameters found in Step 2
-    # ---------------------------------------------------------
-    BEST_LAM = 32.0       
-    BEST_EMISS = 0.715   
-    
-    # 2. Set the sequence of solar multiplier (Gamma) changes
-    # ---------------------------------------------------------
-    # Requirement: From 0.4 to 1.4.
-    # To draw the full loop, run in two phases:
-    # Phase 1: Cooling process (Start from Warm Earth, decrease solar, until frozen)
-    # Start gamma at 1.4 and decrease to 0.4
-    gamma_down = np.arange(1.4, 0.39, -0.05) 
-    
-    # Phase 2: Warming process (Start from Snowball Earth, increase solar, until melted)
-    # Start gamma at 0.4 and increase to 1.4
-    gamma_up = np.arange(0.4, 1.41, 0.05)
+    # 1. Tuned parameters
+    BEST_LAM = 32.0
+    BEST_EMISS = 0.715
 
-    # 3. Prepare data recording
-    # ---------------------------------------------------------
-    gammas_plot_down = [] # Record cooling gamma
-    temps_plot_down = []  # Record cooling avg temp
-    
-    gammas_plot_up = []   # Record warming gamma
-    temps_plot_up = []    # Record warming avg temp
+    # 2. Gamma sequences: first warm (up), then cool (down)
+    gamma_up = np.arange(0.4, 1.41, 0.05)    # warming branch: 0.4 -> 1.4
+    gamma_down = np.arange(1.4, 0.39, -0.05) # cooling branch: 1.4 -> 0.4
+
+    # 3. Prepare storage
+    gammas_plot_up = []
+    temps_plot_up = []
+    gammas_plot_down = []
+    temps_plot_down = []
 
     dlat, lats = gen_grid()
-    
-    # Calculate weights for global average temp (Equator area large, poles small)
-    # Weighted average is more scientifically accurate
-    weights = np.cos(np.deg2rad(lats-90))
+
+    # cosine weighting for global mean
+    weights = np.cos(np.deg2rad(lats - 90))
     weights /= weights.sum()
 
-    # 4. Phase 1: Cooling process (Cooling Leg)
-    # ---------------------------------------------------------
-    # Initial state: Hot Earth (Ensure starting as Warm Earth)
-    current_temp = np.ones(lats.size) * 60.0 
-    
-    print("Running Cooling Phase (Red Line)...")
-    for g in gamma_down:
-        # Solar = 1370 * g
-        _, current_temp = snowball_earth(lam=BEST_LAM, emiss=BEST_EMISS,
-                                         init_cond=current_temp, # Critical: Use result from previous step as next initial condition!
-                                         solar=1370*g,           # Change solar intensity
-                                         apply_spherecorr=True, apply_insol=True,
-                                         albice=0.6, albgnd=0.3)
-        
-        # Calculate weighted average temperature
-        avg_t = np.sum(current_temp * weights)
-        
-        gammas_plot_down.append(g)
-        temps_plot_down.append(avg_t)
+    # 4. Phase 1: warming from cold Earth
+    print("Running Warming Phase (Start from cold Earth)...")
+    current_temp = np.ones(lats.size) * -60.0  # cold Earth initial condition
 
-    # 5. Phase 2: Warming process (Warming Leg)
-    # ---------------------------------------------------------
-    # Critical: current_temp is the state at end of Phase 1 (Snowball)
-    # Continue using it for the next run
-    
-    print("Running Warming Phase (Blue Line)...")
     for g in gamma_up:
-        _, current_temp = snowball_earth(lam=BEST_LAM, emiss=BEST_EMISS,
-                                         init_cond=current_temp, # Inherit previous temperature (Snowball state)
-                                         solar=1370*g,
-                                         apply_spherecorr=True, apply_insol=True,
-                                         albice=0.6, albgnd=0.3)
-        
+        _, current_temp = snowball_earth(
+            lam=BEST_LAM,
+            emiss=BEST_EMISS,
+            init_cond=current_temp,      # use previous equilibrium
+            solar=1370 * g,
+            apply_spherecorr=True,
+            apply_insol=True,
+            albice=0.6,
+            albgnd=0.3
+        )
         avg_t = np.sum(current_temp * weights)
-        
         gammas_plot_up.append(g)
         temps_plot_up.append(avg_t)
 
-    # 6. Plotting (The Hysteresis Loop)
-    # ---------------------------------------------------------
-    plt.figure(figsize=(10, 7))
-    
-    # Plot cooling curve (Red, pointing left)
-    plt.plot(gammas_plot_down, temps_plot_down, 'r-o', label='Cooling (Start Warm)')
-    # Plot warming curve (Blue, pointing right)
-    plt.plot(gammas_plot_up, temps_plot_up, 'b-o', label='Warming (Start Cold)')
-    
-    # Mark current solar (gamma=1.0)
-    plt.axvline(1.0, color='k', linestyle='--', label='Current Solar (1.0)')
+    # 5. Phase 2: cooling after turnaround at gamma=1.4
+    print("Running Cooling Phase (Turnaround from warm state)...")
 
-    # Decoration
-    plt.title(f'Bistability of Earth Climate')
+    for g in gamma_down:
+        _, current_temp = snowball_earth(
+            lam=BEST_LAM,
+            emiss=BEST_EMISS,
+            init_cond=current_temp,      # again reuse previous equilibrium
+            solar=1370 * g,
+            apply_spherecorr=True,
+            apply_insol=True,
+            albice=0.6,
+            albgnd=0.3
+        )
+        avg_t = np.sum(current_temp * weights)
+        gammas_plot_down.append(g)
+        temps_plot_down.append(avg_t)
+
+    # 6. Plotting
+    plt.figure(figsize=(10, 7))
+    plt.plot(gammas_plot_up, temps_plot_up, 'b-o', label='Warming (start cold)')
+    plt.plot(gammas_plot_down, temps_plot_down, 'r-o', label='Cooling (turnaround)')
+    plt.axvline(1.0, color='k', linestyle='--', label='Current Solar (gamma=1.0)')
+    plt.title('Bistability of Earth Climate')
     plt.xlabel('Solar Multiplier (gamma)')
     plt.ylabel('Global Average Temperature (°C)')
     plt.grid(True)
     plt.legend()
     plt.show()
+
 
 
 if __name__ == '__main__':
