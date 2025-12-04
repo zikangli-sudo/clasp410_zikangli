@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 plt.style.use('fivethirtyeight')
 
-# constants:
-radearth = 6357000.  # Earth radius in meters.
+# constants
+radearth = 6357000.  # Earth radius in meters
 mxdlyr = 50.         # depth of mixed layer (m)
 sigma = 5.67e-8      # Steffan-Boltzman constant
 C = 4.2e6            # Heat capacity of water
@@ -48,8 +48,8 @@ def gen_grid(npoints=18):
         Locations of all grid cell centers.
     '''
 
-    dlat = 180 / npoints  # Latitude spacing.
-    lats = np.linspace(dlat/2., 180-dlat/2., npoints)  # Lat cell centers.
+    dlat = 180 / npoints  # Latitude spacing
+    lats = np.linspace(dlat/2., 180-dlat/2., npoints)  # Lat cell centers
 
     return dlat, lats
 
@@ -68,16 +68,16 @@ def temp_warm(lats_in):
     temp : Numpy array
         Temperature in Celcius.
     '''
-    # Set initial temperature curve:
+    # Set initial temperature curve
     T_warm = np.array([-47, -19, -11, 1, 9, 14, 19, 23, 25, 25,
                        23, 19, 14, 9, 1, -11, -19, -47])
-    # Get base grid:
+    # Get base grid
     npoints = T_warm.size
     dlat, lats = gen_grid(npoints)
 
     coeffs = np.polyfit(lats, T_warm, 2)
 
-    # Now, return fitting:
+    # return fitting
     temp = coeffs[2] + coeffs[1]*lats_in + coeffs[0] * lats_in**2
 
     return temp
@@ -104,10 +104,10 @@ def insolation(S0, lats):
         Insolation returned over the input latitudes.
     '''
 
-    # Constants:
-    max_tilt = 23.5   # tilt of earth in degrees
+    # Constants
+    max_tilt = 23.5   
 
-    # Create an array to hold insolation:
+    # Create an array to hold insolation
     insolation = np.zeros(lats.size)
 
     #  Daily rotation of earth reduces solar constant by distributing the sun
@@ -118,19 +118,19 @@ def insolation(S0, lats):
     total_solar = S0 * angle.sum()
     S0_avg = total_solar / (360/dlong)
 
-    # Accumulate normalized insolation through a year.
-    # Start with the spin axis tilt for every day in 1 year:
+    # Accumulate normalized insolation through a year
+    # Start with the spin axis tilt for every day in 1 year
     tilt = [max_tilt * np.cos(2.0*np.pi*day/365) for day in range(365)]
 
-    # Apply to each latitude zone:
+    # Apply to each latitude zone
     for i, lat in enumerate(lats):
-        # Get solar zenith; do not let it go past 180. Convert to latitude.
+        # Get solar zenith
         zen = lat - 90. + tilt
         zen[zen > 90] = 90
-        # Use zenith angle to calculate insolation as function of latitude.
+        # Use zenith angle to calculate insolation as function of latitude
         insolation[i] = S0_avg * np.sum(np.cos(np.pi/180. * zen)) / 365.
 
-    # Average over entire year; multiply by S0 amplitude:
+    # Average over entire year， multiply by S0 amplitude
     insolation = S0_avg * insolation / 365
 
     return insolation
@@ -155,9 +155,7 @@ def snowball_earth(nlat=18, tfinal=10000, dt=1.0, lam=100., emiss=1.0,
     emiss : float, defaults to 1.0
         Set emissivity of Earth/ground.
     init_cond : function, float, or array
-        Set the initial condition of the simulation. If a function is given,
-        it must take latitudes as input and return temperature as a function
-        of lat. Otherwise, the given values are used as-is.
+        Set the initial condition of the simulation.
     apply_spherecorr : bool, defaults to False
         Apply spherical correction term
     apply_insol : bool, defaults to False
@@ -176,29 +174,29 @@ def snowball_earth(nlat=18, tfinal=10000, dt=1.0, lam=100., emiss=1.0,
         Temperature as a function of latitude.
     '''
 
-    # Set up grid:
+    # Set up grid
     dlat, lats = gen_grid(nlat)
-    # Y-spacing for cells in physical units:
+    # Y-spacing for cells in physical units
     dy = np.pi * radearth / nlat
 
-    # Create our first derivative operator.
+    # Create first derivative operator
     B = np.zeros((nlat, nlat))
     B[np.arange(nlat-1)+1, np.arange(nlat-1)] = -1
     B[np.arange(nlat-1), np.arange(nlat-1)+1] = 1
     B[0, :] = B[-1, :] = 0
 
-    # Create area array:
+    # Create area array
     Axz = np.pi * ((radearth+50.0)**2 - radearth**2) * np.sin(np.pi/180.*lats)
-    # Get derivative of Area:
+    # Get derivative of Area
     dAxz = np.matmul(B, Axz)
 
-    # Set number of time steps:
+    # Set number of time steps
     nsteps = int(tfinal / dt)
 
-    # Set timestep to seconds:
+    # Set timestep to seconds
     dt = dt * 365 * 24 * 3600
 
-    # Create insolation:
+    # Create insolation
     insol = insolation(solar, lats)
 
     # Create temp array; set our initial condition
@@ -208,29 +206,29 @@ def snowball_earth(nlat=18, tfinal=10000, dt=1.0, lam=100., emiss=1.0,
     else:
         Temp += init_cond
 
-    # Create our K matrix:
+    # Create our K matrix
     K = np.zeros((nlat, nlat))
     K[np.arange(nlat), np.arange(nlat)] = -2
     K[np.arange(nlat-1)+1, np.arange(nlat-1)] = 1
     K[np.arange(nlat-1), np.arange(nlat-1)+1] = 1
-    # Boundary conditions:
+    # Boundary conditions
     K[0, 1], K[-1, -2] = 2, 2
-    # Units!
+    # Units
     K *= 1/dy**2
 
-    # Create L matrix.
+    # Create L matrix
     Linv = np.linalg.inv(np.eye(nlat) - dt * lam * K)
 
     # Set initial albedo.
     albedo = np.zeros(nlat)
-    loc_ice = Temp <= -10  # Sea water freezes at ten below.
+    loc_ice = Temp <= -10  # Sea water freezes at ten below
     albedo[loc_ice] = albice
     albedo[~loc_ice] = albgnd
 
-    # SOLVE!
+    
     for istep in range(nsteps):
         # Update Albedo:
-        loc_ice = Temp <= -10  # Sea water freezes at ten below.
+        loc_ice = Temp <= -10  # Sea water freezes at ten below
         albedo[loc_ice] = albice
         albedo[~loc_ice] = albgnd
 
@@ -240,7 +238,7 @@ def snowball_earth(nlat=18, tfinal=10000, dt=1.0, lam=100., emiss=1.0,
         else:
             sphercorr = 0
 
-        # Apply radiative/insolation term:
+        # Apply radiative/insolation term
         if apply_insol:
             radiative = (1-albedo)*insol - emiss*sigma*(Temp+273)**4
             Temp += dt * radiative / (rho*C*mxdlyr)
@@ -256,24 +254,23 @@ def problem1():
     Create solution figure for Problem 1 (also validate our code qualitatively)
     '''
 
-    # Get warm Earth initial condition.
+    # Get warm Earth initial condition
     dlat, lats = gen_grid()
     temp_init = temp_warm(lats)
 
-    # Get solution after 10K years for each combination of terms:
+    # Get solution after 10K years for each combination of terms
     lats, temp_diff = snowball_earth()
     lats, temp_sphe = snowball_earth(apply_spherecorr=True)
     lats, temp_alls = snowball_earth(apply_spherecorr=True, apply_insol=True,
                                      albice=.3)
 
-    # Create a fancy plot!
+    # Create plot
     fig, ax = plt.subplots(1, 1)
     ax.plot(lats-90, temp_init, label='Initial Condition')
     ax.plot(lats-90, temp_diff, label='Basic Diffusion')
     ax.plot(lats-90, temp_sphe, label='Diff. + Spherical Correction')
     ax.plot(lats-90, temp_alls, label='Diff. + SphCorr + Radiative')
 
-    # Customize like those annoying insurance commercials
     ax.set_title('Final Steady State')
     ax.set_ylabel(r'Temp ($^{\circ}C$)')
     ax.set_xlabel('Latitude')
@@ -295,7 +292,7 @@ def test_functions():
         print(f"Got: {gen_grid(5)}")
 
 # =============================================================================
-# NEW CODE FOR PROBLEM 2 (Appended after starter code)
+# PROBLEM 2 
 # =============================================================================
 
 def problem2():
@@ -318,7 +315,7 @@ def problem2():
     # -----------------------------------------------------
     # Note: To see the shape clearly, we must fix emissivity to a 
     # reasonable value (e.g., 0.75) instead of 1.0, otherwise all 
-    # curves will be too cold to compare effectively.
+    # curves will be too cold to compare effectively
     fixed_emiss_test = 0.75 
     lam_values = [0, 50, 100, 150] # Range requested
     
@@ -397,13 +394,11 @@ def find_absolute_minimum():
             # Calculate Error
             rmse = np.sqrt(np.mean((model_temp - target_temp)**2))
             
-            # Save if best
             if rmse < best_rmse:
                 best_rmse = rmse
                 best_lam = lam
                 best_emiss = emiss
             
-            # Progress bar 
             count += 1
             if count % 100 == 0:
                 print(f"Scanned {count}/{total_combinations} combinations...", end='\r')
@@ -491,7 +486,7 @@ def problem3():
 
     ax.plot(lats-90, temp_flash, 'g--', linewidth=2, label='Start: Warm but Albedo=0.6')
 
-    # 5. Plot decoration
+    # 5. Plot
     # -------------------------------------------
     ax.set_title(f'Stability Analysis in Different Initial Conditions')
     ax.set_ylabel('Temperature (°C)')
@@ -517,8 +512,8 @@ def problem4():
 
     # 1. Use best parameters found in Step 2
     # ---------------------------------------------------------
-    BEST_LAM = 32.0       # <--- Ensure this matches your previous Best Value
-    BEST_EMISS = 0.715    # <--- Ensure this matches your previous Best Value
+    BEST_LAM = 32.0       
+    BEST_EMISS = 0.715   
     
     # 2. Set the sequence of solar multiplier (Gamma) changes
     # ---------------------------------------------------------
@@ -544,7 +539,7 @@ def problem4():
     
     # Calculate weights for global average temp (Equator area large, poles small)
     # Weighted average is more scientifically accurate
-    weights = np.cos(np.deg2rad(lats-90)) # Simple cosine weighting
+    weights = np.cos(np.deg2rad(lats-90))
     weights /= weights.sum()
 
     # 4. Phase 1: Cooling process (Cooling Leg)
